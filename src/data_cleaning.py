@@ -20,11 +20,25 @@ def add_session(lf: pl.LazyFrame) -> pl.LazyFrame:
                            .otherwise(pl.lit("after"))
                            .alias("session"))
 
+def add_usable_trade(lf: pl.LazyFrame) -> pl.LazyFrame:
+     """Mark regular-session round-lot trades (extended-hours and odd-lot bits both clear)."""
+     return lf.with_columns(
+         (
+             (pl.col("type") == "trade_report") &
+             (pl.col("session") == "regular") &
+             ((pl.col("flags") & 0x60) == 0)
+         ).alias("usable_trade")
+     )
+
 if __name__ == "__main__":
     lf = pl.scan_parquet(str(PARTS))
     before = lf.select(pl.len()).collect().item()
     after = drop_consecutive_duplicates(lf).select(pl.len()).collect().item()
     print(before - after)
 
-    lf = pl.scan_parquet(str(PARTS))
     print(add_session(lf).group_by("symbol", "session").agg(pl.len()).sort("symbol", "session").collect())
+
+    lf2 = add_usable_trade(add_session(lf))
+    print(lf2.filter(pl.col("type") == "trade_report").group_by("symbol").agg(
+        pl.len().alias("trades"),pl.col("usable_trade").sum().alias("usable"),
+    ).sort("symbol").collect())
