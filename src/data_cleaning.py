@@ -30,15 +30,54 @@ def add_usable_trade(lf: pl.LazyFrame) -> pl.LazyFrame:
          ).alias("usable_trade")
      )
 
+def rebuild_book(quotes: pl.DataFrame) -> pl.DataFrame:
+    """Replay price-level updates for ONE symbol (in file order) and record
+    the best bid/ask after every update with flags == 1."""
+    bids,asks = {},{}
+    time_stamps,bid_prices,bid_sizes,ask_prices,ask_sizes = [],[],[],[],[]
+    for ts , side , price , size , flags in quotes.select(
+        "timestamp","side","price","size","flags"
+    ).iter_rows():
+        book = bids if side == "B" else asks
+        if size == 0 :
+            book.pop(price,None)
+        else:
+            book[price] = size
+        if flags == 1 :
+            bp = max(bids) if bids else None
+            ap = min(asks) if asks else None
+            time_stamps.append(ts)
+            bid_prices.append(bp)
+            bid_sizes.append(bids[bp] if bp is not None else None)
+            ask_prices.append(ap)
+            ask_sizes.append(asks[ap] if ap is not None else None)
+    return pl.DataFrame(
+        {"timestamp" : time_stamps , "bid_prices" : bid_prices , "bid_sizes" : bid_sizes,
+         "ask_prices": ask_prices,"ask_sizes": ask_sizes},
+         schema={"timestamp" : pl.Datetime("us","UTC"),"bid_prices":pl.Float64,
+                 "bid_sizes" : pl.Int64,"ask_prices":pl.Float64,"ask_sizes":pl.Int64},
+    )
+
+# if __name__ == "__main__":
+#     lf = pl.scan_parquet(str(PARTS))
+#     before = lf.select(pl.len()).collect().item()
+#     after = drop_consecutive_duplicates(lf).select(pl.len()).collect().item()
+#     print(before - after)
+
+#     print(add_session(lf).group_by("symbol", "session").agg(pl.len()).sort("symbol", "session").collect())
+
+#     lf2 = add_usable_trade(add_session(lf))
+#     print(lf2.filter(pl.col("type") == "trade_report").group_by("symbol").agg(
+#         pl.len().alias("trades"),pl.col("usable_trade").sum().alias("usable"),
+#     ).sort("symbol").collect())
+
 if __name__ == "__main__":
     lf = pl.scan_parquet(str(PARTS))
-    before = lf.select(pl.len()).collect().item()
-    after = drop_consecutive_duplicates(lf).select(pl.len()).collect().item()
-    print(before - after)
-
-    print(add_session(lf).group_by("symbol", "session").agg(pl.len()).sort("symbol", "session").collect())
-
-    lf2 = add_usable_trade(add_session(lf))
-    print(lf2.filter(pl.col("type") == "trade_report").group_by("symbol").agg(
-        pl.len().alias("trades"),pl.col("usable_trade").sum().alias("usable"),
-    ).sort("symbol").collect())
+    spy = (lf.filter((pl.col("symbol") == "SPY") & (pl.col("type") == "price_level_update"))
+             .head(200_000).collect())
+    book = rebuild_book(spy)
+    print(book.head(8))
+    print(book.tail(5))
+    print("empty bid:", book["bid_prices"].is_null().sum(),
+          "| empty ask:", book["ask_prices"].is_null().sum(),
+          "| crossed:", (book["bid_prices"] >= book["ask_prices"]).sum())
