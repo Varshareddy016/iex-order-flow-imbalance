@@ -58,37 +58,40 @@ def rebuild_book(quotes: pl.DataFrame) -> pl.DataFrame:
                  "bid_sizes" : pl.Int64,"ask_prices":pl.Float64,"ask_sizes":pl.Int64},
     )
 
-# if __name__ == "__main__":
-#     lf = pl.scan_parquet(str(PARTS))
-#     before = lf.select(pl.len()).collect().item()
-#     after = drop_consecutive_duplicates(lf).select(pl.len()).collect().item()
-#     print(before - after)
+def add_ofi(book: pl.DataFrame) -> pl.DataFrame:
+    """Best-level order flow imbalance for each recorded state (Cont, Kukanov & Stoikov 2014)."""
+    bp , bq = pl.col("bid_prices") , pl.col("bid_sizes")
+    ap , aq = pl.col("ask_prices") , pl.col("ask_sizes")
+    bp0, bq0 = bp.shift(1), bq.shift(1)
+    ap0, aq0 = ap.shift(1), aq.shift(1)
 
-#     print(add_session(lf).group_by("symbol", "session").agg(pl.len()).sort("symbol", "session").collect())
+    bid_part = pl.when(bp >= bp0).then(bq).otherwise(0) - pl.when(bp <= bp0).then(bq0).otherwise(0)
+    ask_part = pl.when(ap <= ap0).then(aq).otherwise(0) - pl.when(ap >= ap0).then(aq0).otherwise(0)
 
-#     lf2 = add_usable_trade(add_session(lf))
-#     print(lf2.filter(pl.col("type") == "trade_report").group_by("symbol").agg(
-#         pl.len().alias("trades"),pl.col("usable_trade").sum().alias("usable"),
-#     ).sort("symbol").collect())
+    valid = pl.all_horizontal([e.is_not_null() for e in (bp, bq, ap, aq, bp0, bq0, ap0, aq0)])
+    return book.with_columns(
+        pl.when(valid).then(bid_part - ask_part).otherwise(None).alias("ofi")
+    )
+SYMBOLS = ["SPY", "QQQ", "IWM", "EMB", "VCSH"]
+OUT = ROOT / "data" / "processed"
 
-# if __name__ == "__main__":
-#     lf = pl.scan_parquet(str(PARTS))
-#     spy = (lf.filter((pl.col("symbol") == "SPY") & (pl.col("type") == "price_level_update"))
-#              .head(200_000).collect())
-#     book = rebuild_book(spy)
-#     print(book.head(8))
-#     print(book.tail(5))
-#     print("empty bid:", book["bid_prices"].is_null().sum(),
-#           "| empty ask:", book["ask_prices"].is_null().sum(),
-#           "| crossed:", (book["bid_prices"] >= book["ask_prices"]).sum())
+def build_processed():
+    OUT.mkdir(parents=True, exist_ok=True)
+    lf = drop_consecutive_duplicates(pl.scan_parquet(str(PARTS)))
+
+    books = []
+    for sym in SYMBOLS:
+        q = lf.filter((pl.col("symbol") == sym) & (pl.col("type") == "price_level_update")).collect()
+        books.append(add_ofi(rebuild_book(q)).with_columns(pl.lit(sym).alias("symbol")))
+    book = add_session(pl.concat(books).lazy()).with_columns(
+        ((pl.col("bid_prices") + pl.col("ask_prices")) / 2).alias("mid"),
+        (pl.col("ask_prices") - pl.col("bid_prices")).alias("spread"),
+    ).with_columns(pl.col("mid").diff().over("symbol").alias("dmid")).collect()
+    book.write_parquet(OUT / "book_states.parquet")
+
+    trades = add_usable_trade(add_session(lf.filter(pl.col("type") == "trade_report"))).collect()
+    trades.write_parquet(OUT / "trades.parquet")
+    print("book states:", len(book), "| trades:", len(trades))
 
 if __name__ == "__main__":
-    import time
-    lf = pl.scan_parquet(str(PARTS))
-    spy = lf.filter((pl.col("symbol") == "SPY") & (pl.col("type") == "price_level_update")).collect()
-    t0 = time.time()
-    book = rebuild_book(spy)
-    print(len(spy), len(book), f"{time.time() - t0:.0f}s")
-    print("empty bid:", book["bid_prices"].is_null().sum(),
-          "| empty ask:", book["ask_prices"].is_null().sum(),
-          "| crossed:", (book["bid_prices"] >= book["ask_prices"]).sum())
+    build_processed()

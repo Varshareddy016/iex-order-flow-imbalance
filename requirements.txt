@@ -1,1 +1,6 @@
-iex_parser
+iex_parser==1.7.0
+pyarrow==21.0.0
+polars==1.36.1
+matplotlib
+seaborn
+jupyter
