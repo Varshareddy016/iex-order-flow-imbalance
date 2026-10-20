@@ -23,7 +23,15 @@ def main():
     t0 = time.time()
 
     print("== 1. ACQUIRE / PARSE ==")
-    if args.reparse or not any(INTERIM.glob("part_*.parquet")):
+    have_parts = any(INTERIM.glob("part_*.parquet"))
+    if args.reparse or not have_parts:
+        if not data_access.RAW.exists():
+            raise SystemExit(
+                f"Raw file not found: {data_access.RAW}\n"
+                "Download it (see data/raw/README.md), or copy data/interim/ here,\n"
+                "or skip the pipeline and open notebooks/phase2_analysis.ipynb,\n"
+                "which only needs data/processed/."
+            )
         data_access.main()
     else:
         print(f"parsed parts found in {INTERIM}, skipping (use --reparse to redo)")
