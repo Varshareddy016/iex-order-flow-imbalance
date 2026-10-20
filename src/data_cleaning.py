@@ -71,13 +71,24 @@ def rebuild_book(quotes: pl.DataFrame) -> pl.DataFrame:
 #         pl.len().alias("trades"),pl.col("usable_trade").sum().alias("usable"),
 #     ).sort("symbol").collect())
 
+# if __name__ == "__main__":
+#     lf = pl.scan_parquet(str(PARTS))
+#     spy = (lf.filter((pl.col("symbol") == "SPY") & (pl.col("type") == "price_level_update"))
+#              .head(200_000).collect())
+#     book = rebuild_book(spy)
+#     print(book.head(8))
+#     print(book.tail(5))
+#     print("empty bid:", book["bid_prices"].is_null().sum(),
+#           "| empty ask:", book["ask_prices"].is_null().sum(),
+#           "| crossed:", (book["bid_prices"] >= book["ask_prices"]).sum())
+
 if __name__ == "__main__":
+    import time
     lf = pl.scan_parquet(str(PARTS))
-    spy = (lf.filter((pl.col("symbol") == "SPY") & (pl.col("type") == "price_level_update"))
-             .head(200_000).collect())
+    spy = lf.filter((pl.col("symbol") == "SPY") & (pl.col("type") == "price_level_update")).collect()
+    t0 = time.time()
     book = rebuild_book(spy)
-    print(book.head(8))
-    print(book.tail(5))
+    print(len(spy), len(book), f"{time.time() - t0:.0f}s")
     print("empty bid:", book["bid_prices"].is_null().sum(),
           "| empty ask:", book["ask_prices"].is_null().sum(),
           "| crossed:", (book["bid_prices"] >= book["ask_prices"]).sum())
