@@ -5,8 +5,9 @@ import pyarrow.parquet as pq
 from iex_parser import Parser, DEEP_1_0
 import time
 
-RAW = "../data/raw/deep_20260911.pcap.gz"
-OUT = Path("../data/interim/deep_20260911")
+ROOT = Path(__file__).resolve().parent.parent
+RAW = ROOT / "data" / "raw" / "deep_20260911.pcap.gz"
+OUT = ROOT / "data" / "interim" / "deep_20260911"
 SYMBOLS = {"SPY","QQQ","IWM","VCSH","EMB"}
 KEEP_TYPES = {"price_level_update","trade_report"}
 CHUNK = 100000
@@ -32,7 +33,7 @@ def main():
     OUT.mkdir(parents=True,exist_ok=True)
     rows,part,seen = [],0,0
     start = time.time()
-    with Parser (RAW,DEEP_1_0) as reader:
+    with Parser(str(RAW), DEEP_1_0) as reader:
         for msg in reader:
             # if seen > 200000:
             #     break;
