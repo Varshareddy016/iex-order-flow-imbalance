@@ -3,3 +3,5 @@ data/raw/*.pcap.gz
 __pycache__/
 *.pyc
 data/interim/
+.venv/
+.venv311/
