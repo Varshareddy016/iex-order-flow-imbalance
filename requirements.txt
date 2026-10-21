@@ -4,3 +4,4 @@ polars==1.36.1
 matplotlib
 seaborn
 jupyter
+scipy
