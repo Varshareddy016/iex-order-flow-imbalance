@@ -4,4 +4,4 @@ __pycache__/
 *.pyc
 data/interim/
 .venv/
-.venv311/
+.venv311/.DS_Store
