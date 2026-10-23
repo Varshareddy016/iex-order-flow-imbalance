@@ -1,0 +1,16 @@
+symbol,session,quotes,trades,quotes_per_trade
+EMB,after,3,,
+EMB,pre,352,,
+EMB,regular,92818,1661,55.9
+IWM,after,1633,23,71.0
+IWM,pre,180,13,13.8
+IWM,regular,1973381,10358,190.5
+QQQ,after,17157,48,357.4
+QQQ,pre,60799,98,620.4
+QQQ,regular,3010264,7548,398.8
+SPY,after,2422,26,93.2
+SPY,pre,23606,66,357.7
+SPY,regular,2236684,18779,119.1
+VCSH,after,7,,
+VCSH,pre,48,,
+VCSH,regular,32147,476,67.5
