@@ -51,6 +51,16 @@ python src/pipeline.py --reparse    # re-parse the raw pcap (~10 hours)
 
 Stages: acquire/parse -> profile -> clean/transform -> processed data.
 
+First analytics (needs only `data/processed/`, ~30 s):
+
+```bash
+python src/analytics.py             # writes results/*.csv
+```
+
+- `results/ofi_vs_dmid_by_window.csv`: rank correlation and Theil-Sen slope (seed 42, 5,000 windows) per symbol and window (1 s, 10 s, 1 min)
+- `results/next_trade_hit_rate.csv`: next-trade side vs prior 1 s OFI, with the majority baseline
+- `results/hit_rate_by_window_and_gap.csv`: hit rate as the window shrinks, and with a gap before the trade
+
 Then open `notebooks/phase2_analysis.ipynb`. It loads `data/processed/` and
 holds the EDA, first analytics and interpretation.
 
@@ -67,7 +77,7 @@ Outputs in `data/processed/`:
 - `book_states.parquet`: best bid/ask, OFI, mid-price, spread and session for every recorded book state
 - `trades.parquet`: all trade reports with session and a `usable_trade` flag
 
-Random seeds: none used so far. Any sampling added later will set a fixed seed.
+Random seeds: 42 for the 5,000-window sample behind the Theil-Sen fit (notebook and `src/analytics.py`).
 
 ## Project Status
 
@@ -85,6 +95,7 @@ data/
   raw/         — raw pcap (not committed)
   interim/     — parsed Parquet parts (not committed, rebuilt by the pipeline)
   processed/   — cleaned book states and trades (committed, 45 MB)
+results/       — analytics tables (CSV), rebuilt by src/analytics.py
 src/           — pipeline source code
 notebooks/     — phase2_analysis.ipynb
 ```
