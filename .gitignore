@@ -5,3 +5,4 @@ __pycache__/
 data/interim/
 .venv/
 .venv311/.DS_Store
+.DS_Store
